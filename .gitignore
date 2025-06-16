@@ -1,0 +1,46 @@
+
+######## 1. Node / package managers
+# top-level node_modules
+node_modules/
+# nested node_modules in packages
+server/node_modules/
+client/node_modules/
+
+# lockfiles you might not want
+# (keep one if your team uses it consistently)
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+######## 2. Builds / dist / coverage
+client/build/
+dist/
+coverage/
+logs/
+server/logs/
+
+######## 3. Environment & secrets
+.env
+.env.*
+!.env.example       # keep the sample file
+
+# misc local override files (Create React App etc.)
+*.local
+
+######## 4. SSL / keys
+*.pem
+*.key
+
+######## 5. IDE / OS clutter
+# macOS / Windows
+.DS_Store
+Thumbs.db
+
+# JetBrains / VS Code
+.idea/
+.vscode/
+
+######## 6. Misc runtime artifacts
+.nyc_output/
+.nodemon-debug.json
