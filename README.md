@@ -60,6 +60,3 @@ financial-system/
 └── README.md
 ```
 
-## License
-
-MIT © Your Name 
