@@ -27,13 +27,10 @@ A full-stack financial management system built with the **MERN** stack.
  cp .env.example .env
  # → fill in MONGODB_URI and JWT_SECRET etc.
 
-# 4. Seed sample data (optional)
- npm run seed
-
-# 5. Run dev servers (React + API)
+# 4. Run dev servers (React + API)
  npm run dev
 
-# 6. Open client
+# 5. Open client
  http://localhost:3000
 ```
 
@@ -44,7 +41,6 @@ A full-stack financial management system built with the **MERN** stack.
 | `npm run dev` | Concurrently starts API (Nodemon, port 5000) and React client (port 3000) |
 | `npm run server` | API only |
 | `npm run client` | React client only |
-| `npm run seed` | Populate MongoDB with sample users, accounts & transactions |
 
 ## Folder Structure
 
