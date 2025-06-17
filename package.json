@@ -7,12 +7,9 @@
     "start": "node server/server.js",
     "server": "nodemon server/server.js",
     "client": "cd client && npm start",
-    "client-install": "cd client && npm install",
-    "server-install": "cd server && npm install",
-    "install-all": "npm install && npm run client-install && npm run server-install",
-    "dev": "concurrently \"npm run server\" \"npm run client\"",
-    "build": "cd client && npm run build",
-    "heroku-postbuild": "npm run client-install && npm run build"
+    "install": "npm install --prefix client && npm install --prefix server",
+    "build": "npm run build --prefix client",
+    "dev": "concurrently \"npm run server\" \"npm run client\""
   },
   "dependencies": {
     "@faker-js/faker": "^9.8.0",
