@@ -7,7 +7,7 @@
     "start": "node server/server.js",
     "server": "nodemon server/server.js",
     "client": "cd client && npm start",
-    "install": "cd client && npm install && cd ../server && npm install",
+    "setup": "cd client && npm install && cd ../server && npm install",
     "build": "cd client && npm run build",
     "dev": "concurrently \"npm run server\" \"npm run client\""
   },
