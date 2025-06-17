@@ -11,6 +11,7 @@ class BalanceService {
         const populatedData = {
             ...transactionData,
             transaction_id: transactionData.transaction_id || require('crypto').randomBytes(5).toString('hex'),
+            // Only set category to 'misc' if it's not provided
             category: transactionData.category || 'misc'
         };
 
@@ -23,88 +24,119 @@ class BalanceService {
             await session.commitTransaction();
             return result;
         } catch (err) {
+            if (session) await session.abortTransaction();
+            
             // Fallback if sessions / transactions are not supported (code 20)
             if (err?.code === 20 || /Transaction numbers are only allowed/.test(err?.message || '')) {
                 if (session) await session.endSession();
                 return await this._processWithoutSession(populatedData);
             }
-            if (session) await session.abortTransaction();
+            
             throw err;
         } finally {
-            if (session) session?.endSession();
+            if (session) await session.endSession();
         }
     }
 
     // Internal helper using a session
     static async _processWithSession(transactionData, session) {
-        const account = await Account.findOne({
-            account_number: transactionData.account_number,
-            status: 'active'
-        }).session(session);
+        try {
+            const account = await Account.findOne({
+                account_number: transactionData.account_number,
+                status: 'active'
+            }).session(session);
 
-        if (!account) {
-            throw new Error('Account not found or inactive');
+            if (!account) {
+                throw new Error('Account not found or inactive');
+            }
+
+            // attach user_id from account if missing
+            if (!transactionData.user_id) transactionData.user_id = account.user_id.toString();
+
+            await this.validateTransaction(account, transactionData);
+
+            // Create transaction first
+            const transaction = new Transaction({
+                ...transactionData,
+                status: 'pending'
+            });
+
+            // Save the pending transaction
+            await transaction.save({ session });
+
+            const newBalance = this.calculateNewBalance(account.balance, transactionData);
+
+            // Update account balance
+            await Account.findByIdAndUpdate(
+                account._id,
+                {
+                    balance: newBalance,
+                    last_transaction_date: new Date()
+                },
+                { session, new: true }
+            );
+
+            // Update transaction status to success
+            transaction.status = 'success';
+            await transaction.save({ session });
+
+            return { success: true, transaction, newBalance };
+        } catch (error) {
+            throw error;
         }
-
-        // attach user_id from account if missing
-        if (!transactionData.user_id) transactionData.user_id = account.user_id.toString();
-
-        await this.validateTransaction(account, transactionData);
-
-        const transaction = new Transaction({
-            ...transactionData,
-            status: 'pending'
-        });
-
-        const newBalance = this.calculateNewBalance(account.balance, transactionData);
-
-        await Account.findByIdAndUpdate(
-            account._id,
-            {
-                balance: newBalance,
-                last_transaction_date: new Date()
-            },
-            { session }
-        );
-
-        transaction.status = 'success';
-        await transaction.save({ session });
-
-        return { success: true, transaction, newBalance };
     }
 
     // Internal helper without session (stand-alone Mongo)
     static async _processWithoutSession(transactionData) {
-        const account = await Account.findOne({
-            account_number: transactionData.account_number,
-            status: 'active'
-        });
+        try {
+            const account = await Account.findOne({
+                account_number: transactionData.account_number,
+                status: 'active'
+            });
 
-        if (!account) {
-            throw new Error('Account not found or inactive');
-        }
-
-        if (!transactionData.user_id) transactionData.user_id = account.user_id.toString();
-
-        await this.validateTransaction(account, transactionData);
-
-        const newBalance = this.calculateNewBalance(account.balance, transactionData);
-
-        // atomic update using $set & $inc
-        await Account.updateOne(
-            { _id: account._id },
-            {
-                $set: { last_transaction_date: new Date() },
-                $inc: { balance: transactionData.transaction_type === 'credit' ? transactionData.amount : -transactionData.amount }
+            if (!account) {
+                throw new Error('Account not found or inactive');
             }
-        );
 
-        const transaction = await Transaction.create({
-            ...transactionData,
-            status: 'success'
-        });
+            if (!transactionData.user_id) transactionData.user_id = account.user_id.toString();
 
-        return { success: true, transaction, newBalance };
+            await this.validateTransaction(account, transactionData);
+
+            // Create transaction first
+            const transaction = await Transaction.create({
+                ...transactionData,
+                status: 'pending'
+            });
+
+            const newBalance = this.calculateNewBalance(account.balance, transactionData);
+
+            // Update account balance
+            await Account.updateOne(
+                { _id: account._id },
+                {
+                    $set: { last_transaction_date: new Date() },
+                    $inc: { balance: transactionData.transaction_type === 'credit' ? transactionData.amount : -transactionData.amount }
+                }
+            );
+
+            // Update transaction status to success
+            await Transaction.findByIdAndUpdate(
+                transaction._id,
+                { status: 'success' },
+                { new: true }
+            );
+
+            return { success: true, transaction: { ...transaction.toObject(), status: 'success' }, newBalance };
+        } catch (error) {
+            // If there's an error, mark the transaction as failed
+            if (transaction) {
+                await Transaction.findByIdAndUpdate(
+                    transaction._id,
+                    { status: 'failed' }
+                );
+            }
+            throw error;
+        }
     }
 
     /**
@@ -250,6 +282,38 @@ class BalanceService {
                     account_number: accountNumber,
                     timestamp: { $gte: startDate },
                     status: 'success',
+                    is_deleted: false
+                }
+            },
+            {
+                $group: {
+                    _id: {
+                        category: '$category',
+                        type: '$transaction_type'
+                    },
+                    total_amount: { $sum: '$amount' },
+                    count: { $sum: 1 },
+                    average_amount: { $avg: '$amount' }
+                }
+            },
+            {
+                $group: {
+                    _id: '$_id.category',
+                    transactions: {
+                        $push: {
+                            type: '$_id.type',
+                            total_amount: '$total_amount',
+                            count: '$count',
+                            average_amount: '$average_amount'
+                        }
+                    }
+                }
+            }
+        ]);
+    }
+}
+
+module.exports = BalanceService; 
                     is_deleted: false
                 }
             },
