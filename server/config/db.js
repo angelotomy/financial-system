@@ -10,4 +10,9 @@ const connectDB = async () => {
   }
 };
 
-module.exports = connectDB; 
+const MONGODB_URI = 'mongodb+srv://admin:admin123@cluster0.mongodb.net/financial-system?retryWrites=true&w=majority';
+
+module.exports = {
+    connectDB,
+    MONGODB_URI
+}; 

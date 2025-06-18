@@ -14,11 +14,22 @@ router.post('/bulk-export', transactionController.bulkExport);
 // Export transactions with filters
 router.get('/export', transactionController.exportTransactions);
 
-// Single transaction routes
-router.post('/', transactionController.createTransaction);
+// Get all categories
+router.get('/categories', transactionController.getCategories);
+
+// Get all transactions with filtering
 router.get('/', transactionController.getTransactions);
+
+// Get a single transaction
 router.get('/:id', transactionController.getTransactionById);
+
+// Create a new transaction
+router.post('/', transactionController.createTransaction);
+
+// Update a transaction
 router.put('/:id', transactionController.updateTransaction);
+
+// Delete a transaction
 router.delete('/:id', transactionController.deleteTransaction);
 
 module.exports = router; 

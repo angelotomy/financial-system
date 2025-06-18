@@ -11,8 +11,8 @@ const connectDB = require('../config/database');
 // Configuration
 const USERS_TO_CREATE = 5;
 const ACCOUNTS_PER_USER = 2;
-const TRANSACTIONS_TO_CREATE = 100;
-const BATCH_SIZE = 50;
+const TRANSACTIONS_TO_CREATE = 10000;
+const BATCH_SIZE = 500;
 
 // Categories for transactions
 const TRANSACTION_CATEGORIES = [
@@ -88,6 +88,10 @@ async function createTransactionsInBatches(accounts) {
             const account = faker.helpers.arrayElement(accounts);
             const amount = faker.number.float({ min: 10, max: 5000, multipleOf: 0.01 });
             const transactionType = faker.helpers.arrayElement(['credit', 'debit']);
+            const timestamp = faker.date.between({ 
+                from: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000),
+                to: new Date() 
+            });
             
             const transaction = {
                 transaction_id: faker.string.alphanumeric(10),
@@ -96,7 +100,7 @@ async function createTransactionsInBatches(accounts) {
                 transaction_type: transactionType,
                 amount: amount,
                 description: faker.finance.transactionDescription(),
-                timestamp: faker.date.past({ years: 1 }),
+                timestamp: timestamp,
                 category: faker.helpers.arrayElement(TRANSACTION_CATEGORIES),
                 status: faker.helpers.arrayElement(['success', 'pending', 'failed']),
                 is_deleted: false
@@ -106,7 +110,7 @@ async function createTransactionsInBatches(accounts) {
 
         await Transaction.insertMany(transactions);
         transactionsCreated += transactions.length;
-        console.log(`Created ${transactionsCreated} transactions`);
+        console.log(`Created ${transactionsCreated} transactions (${Math.round(transactionsCreated/TRANSACTIONS_TO_CREATE * 100)}%)`);
     }
 
     console.log('Finished creating transactions');

@@ -1,0 +1,186 @@
+Steps to Increase Dummy Data to 1 Million Records
+
+1. First, install required dependencies in the server directory:
+```bash
+cd server
+npm install @faker-js/faker uuid --save
+```
+
+2. Create a new script file 'server/scripts/generateTransactions.js':
+```javascript
+const mongoose = require('mongoose');
+const { faker } = require('@faker-js/faker');
+const { v4: uuidv4 } = require('uuid');
+const Transaction = require('../models/Transaction');
+
+// Configuration
+const TOTAL_RECORDS = 1000000; // 1 million records
+const BATCH_SIZE = 1000;
+const TOTAL_BATCHES = Math.ceil(TOTAL_RECORDS / BATCH_SIZE);
+
+// Transaction categories
+const CATEGORIES = [
+    'Salary',
+    'Investment',
+    'Transfer',
+    'Withdrawal',
+    'Deposit',
+    'Payment',
+    'Refund',
+    'Other'
+];
+
+// Sample account numbers
+const SAMPLE_ACCOUNT_NUMBERS = Array.from({ length: 50 }, () => 
+    faker.finance.accountNumber(8)
+);
+
+// Get a random date within the last year
+const getRandomDate = () => {
+    const now = new Date();
+    const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+    return faker.date.between({ from: oneYearAgo, to: now });
+};
+
+// Generate a single transaction
+const generateTransaction = () => ({
+    transaction_id: uuidv4(),
+    user_id: 'default_user',
+    account_number: faker.helpers.arrayElement(SAMPLE_ACCOUNT_NUMBERS),
+    transaction_type: faker.helpers.arrayElement(['debit', 'credit']),
+    amount: parseFloat(faker.finance.amount({ min: 10, max: 50000, dec: 2 })),
+    description: faker.helpers.arrayElement([
+        'Monthly Salary',
+        'Rent Payment',
+        'Grocery Shopping',
+        'Utility Bill',
+        'Online Purchase',
+        'Restaurant Payment',
+        'Investment Deposit',
+        'Insurance Premium',
+        'Medical Expense',
+        'Travel Booking'
+    ]),
+    timestamp: getRandomDate(),
+    category: faker.helpers.arrayElement(CATEGORIES),
+    status: faker.helpers.arrayElement(['success', 'pending', 'failed']),
+    is_deleted: false
+});
+
+// Generate and insert transactions in batches
+async function generateAndInsertTransactions() {
+    try {
+        // Connect to MongoDB
+        await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/financial-system');
+        console.log('Connected to MongoDB');
+
+        // Clear existing transactions
+        await Transaction.deleteMany({});
+        console.log('Cleared existing transactions');
+
+        console.time('Data Generation');
+        let totalInserted = 0;
+
+        for (let batchNumber = 1; batchNumber <= TOTAL_BATCHES; batchNumber++) {
+            const batchTransactions = Array.from({ length: BATCH_SIZE }, generateTransaction);
+            
+            await Transaction.insertMany(batchTransactions, { ordered: false });
+            
+            totalInserted += batchTransactions.length;
+            
+            // Progress update
+            const progress = ((batchNumber / TOTAL_BATCHES) * 100).toFixed(2);
+            console.log(`Progress: ${progress}% (${totalInserted.toLocaleString()} records inserted)`);
+        }
+
+        console.timeEnd('Data Generation');
+        console.log(`Successfully inserted ${totalInserted.toLocaleString()} records`);
+
+    } catch (error) {
+        console.error('Error:', error);
+    } finally {
+        await mongoose.disconnect();
+        console.log('Disconnected from MongoDB');
+    }
+}
+
+// Add error handlers
+process.on('SIGINT', async () => {
+    await mongoose.disconnect();
+    process.exit(0);
+});
+
+process.on('uncaughtException', async (err) => {
+    console.error('Uncaught Exception:', err);
+    await mongoose.disconnect();
+    process.exit(1);
+});
+
+// Run the script
+generateAndInsertTransactions();
+```
+
+3. Update server/package.json to add a script for generating data:
+```json
+{
+  "scripts": {
+    // ... other scripts ...
+    "generate-data": "node scripts/generateTransactions.js"
+  }
+}
+```
+
+4. Steps to run:
+
+a. Stop your server if it's running
+b. Navigate to server directory:
+```bash
+cd server
+```
+
+c. Run the generation script:
+```bash
+npm run generate-data
+```
+
+Notes:
+- The script will first clear all existing transactions
+- It generates and inserts transactions in batches of 1000 to manage memory usage
+- Each transaction will have:
+  * Random transaction type (debit/credit)
+  * Random amount between $10 and $50,000
+  * Random category from predefined list
+  * Random status (success/pending/failed)
+  * Timestamp within the last year
+  * Realistic descriptions
+- The script shows progress as it runs
+- Estimated time: 5-15 minutes depending on your system
+- Required disk space: ~500MB-1GB
+- Required RAM: ~2GB minimum
+
+Troubleshooting:
+1. If you get memory errors:
+   - Reduce BATCH_SIZE to 500 or 250
+   - Ensure you have enough free RAM
+   
+2. If you get connection timeouts:
+   - Check your MongoDB connection string
+   - Ensure your MongoDB instance has enough storage
+   - Increase MongoDB timeout settings
+
+3. If the script seems stuck:
+   - Check the MongoDB logs
+   - Monitor system resources
+   - The script prints progress every batch, so you should see regular updates
+
+4. If you need to stop the script:
+   - Press Ctrl+C
+   - The script handles interruption gracefully
+   - Partially inserted data will remain in the database
+
+Performance Tips:
+1. Ensure good network connection to MongoDB
+2. Run during off-peak hours
+3. Consider using a local MongoDB instance for faster insertion
+4. Make sure you have enough disk space
+5. Close other applications to free up RAM 

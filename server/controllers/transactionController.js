@@ -29,8 +29,9 @@ exports.createTransaction = async (req, res) => {
 exports.getTransactions = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 10;
-        const skip = (page - 1) * limit;
+        // Special handling for first page to show 20 items
+        const limit = page === 1 ? 20 : 10;
+        const skip = page === 1 ? 0 : (page - 1) * 10 + 10;
 
         // Build filter object
         const filter = { is_deleted: false };
@@ -378,6 +379,45 @@ exports.bulkDeleteTransactions = async (req, res) => {
         res.json({
             success: true,
             message: `${result.modifiedCount} transaction(s) deleted successfully`
+        });
+    } catch (error) {
+        handleError(res, error);
+    }
+};
+
+// Get all available categories
+exports.getCategories = async (req, res) => {
+    try {
+        // Default categories that should always be available
+        const defaultCategories = [
+            'Salary',
+            'Investment',
+            'Transfer',
+            'Withdrawal',
+            'Deposit',
+            'Payment',
+            'Refund',
+            'Shopping',
+            'Food',
+            'Transportation',
+            'Utilities',
+            'Entertainment',
+            'Healthcare',
+            'Education',
+            'Other'
+        ];
+
+        // Get categories from existing transactions
+        const dbCategories = await Transaction.distinct('category', { is_deleted: false });
+        
+        // Combine default and DB categories, remove duplicates and nulls, and sort
+        const allCategories = [...new Set([...defaultCategories, ...dbCategories])]
+            .filter(Boolean)
+            .sort();
+
+        res.json({
+            success: true,
+            data: allCategories
         });
     } catch (error) {
         handleError(res, error);
